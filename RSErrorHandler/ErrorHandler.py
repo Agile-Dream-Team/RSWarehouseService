@@ -1,4 +1,5 @@
 import json
+import logging
 from RSKafkaWrapper.client import KafkaClient
 
 
@@ -8,6 +9,7 @@ class RSKafkaException(Exception):
         self.message = message
         self.kafka_client = kafka_client
         self.topic = topic
+        logging.error(f"RSKafkaException: {message}")
         self.send_error_to_kafka()
 
     def send_error_to_kafka(self):
