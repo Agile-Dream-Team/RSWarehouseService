@@ -540,3 +540,17 @@ class DeviceService:
             raise RSKafkaException(f"Health check error: {e}", self.kafka_client, "device_health_check_response")
         finally:
             self.db_session.close()
+
+    def get_by_id_device_service(self, kafka_in_dto):
+        try:
+            record_id = kafka_in_dto['id']
+            device = self.device_repository.get_by_id(record_id)
+            logging.info(f"Retrieved device: {device}")
+            device_dict = device.to_dict() if device else {}
+            self.kafka_client.send_message("get_by_id_device_response", device_dict)
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            raise RSKafkaException(f"Database error: {e}", self.kafka_client, "get_by_id_device_response")
+
+        finally:
+            self.db_session.close()

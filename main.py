@@ -422,6 +422,17 @@ def consume_message_register_device(msg):
         RSKafkaException(f"Exception: {e}", kafka_client, "device_migration_response")
 
 
+@kafka_client.topic('get_by_id_device')
+def consume_message_get_by_id_device(msg):
+    try:
+        logging.info(f"Consumed message in get_by_id_device: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.get_by_id_device_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in get_by_id_device: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "get_by_id_device_response")
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
