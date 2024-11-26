@@ -18,8 +18,27 @@ class Bucket(Base):
     # Relationships
     device = relationship(Device, back_populates="buckets")
     user = relationship(User)
+    esp_devices = relationship("ESP32Device", back_populates="bucket", cascade="all, delete-orphan")
 
     def to_dict(self):
+        return {
+            key: value
+            for key, value in {
+                'id': self.id,
+                'serial': self.serial,
+                'name': self.name,
+                'description': self.description,
+                'device_id': self.device_id,
+                'user_id': self.user_id,
+                'esp_devices': [esp.to_dict() for esp in self.esp_devices] if self.esp_devices else None
+            }.items()
+            if value is not None
+        }
+
+    def to_dict_without_esp(self):
+        """
+        Returns dictionary representation without ESP devices to avoid circular references
+        """
         return {
             key: value
             for key, value in {
