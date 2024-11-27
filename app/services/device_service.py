@@ -6,6 +6,10 @@ from app.repository.device_repository import DeviceRepository
 from app.repository.esp32_repository import ESP32Repository
 from RSKafkaWrapper.client import KafkaClient
 from RSErrorHandler.ErrorHandler import RSKafkaException
+from app.utils.db_utils import transaction_scope
+from app.utils.kafka_utils import infer_kafka_topic
+from app.utils.response_utils import create_response
+from fastapi import status
 
 
 class DeviceService:
@@ -15,48 +19,64 @@ class DeviceService:
         self.device_repository = DeviceRepository(self.db_session)
         self.esp32_repository = ESP32Repository(self.db_session)
 
-    def register_device_service(self, kafka_in_dto):
+    @infer_kafka_topic
+    def create_device_service(self, kafka_in_dto, kafka_topic: str = None):
+        """
+        Register a new device with optional ESP32 devices.
+
+        Args:
+            kafka_in_dto: Dictionary containing device registration details
+            kafka_topic: Kafka topic for response messages
+        """
         try:
             logging.info(f"Processing device registration: {kafka_in_dto}")
 
-            # Create device (Raspberry Pi)
-            device = dto_to_entity(kafka_in_dto)
-            device.device_type = 'raspberry_pi'
-            device.status = 'active'
-            device.last_seen = datetime.now(UTC)
+            with transaction_scope(self.db_session, self.kafka_client, kafka_topic):
+                # Create and save main device
+                device = dto_to_entity(kafka_in_dto)
+                device.device_type = 'raspberry_pi'
+                device.status = 'active'
+                device.last_seen = datetime.now(UTC)
+                saved_device = self.device_repository.save(device)
 
-            # Save device
-            saved_device = self.device_repository.save(device)
+                # Process ESP32 devices if any
+                esp_devices = []
+                if 'esp_devices' in kafka_in_dto:
+                    for esp_data in kafka_in_dto['esp_devices']:
+                        esp_device = self.esp32_repository.create_esp32(
+                            device_id=saved_device.id,
+                            esp_id=esp_data['esp_id'],
+                            name=esp_data['name'],
+                            location=esp_data['location'],
+                            capabilities=esp_data['capabilities'],
+                            device_metadata=esp_data.get('metadata', {}),
+                            user_id=saved_device.user_id
+                        )
+                        esp_devices.append(esp_device)
 
-            # Process ESP32 devices if any
-            esp_devices = []
-            if 'esp_devices' in kafka_in_dto:
-                for esp_data in kafka_in_dto['esp_devices']:
-                    esp_device = self.esp32_repository.create_esp32(
-                        device_id=saved_device.id,
-                        esp_id=esp_data['esp_id'],
-                        name=esp_data['name'],
-                        location=esp_data['location'],
-                        capabilities=esp_data['capabilities'],
-                        device_metadata=esp_data.get('metadata', {}),
-                        user_id=saved_device.user_id
-                    )
-                    esp_devices.append(esp_device)
+                # Prepare and send response
+                response = create_response(
+                    status_code=status.HTTP_200_OK,
+                    message="Device registered successfully",
+                    data={
+                        **saved_device.to_dict(),
+                        "esp_devices": [esp.to_dict() for esp in esp_devices]
+                    }
+                )
 
-            # Prepare response
-            response_dict = saved_device.to_dict()
-            response_dict['esp_devices'] = [esp.to_dict() for esp in esp_devices]
-            response_dict['status_code'] = 200
+                self.kafka_client.send_message(kafka_topic, response)
 
-            self.kafka_client.send_message("device_registration_response", response_dict)
-            return saved_device
+        except Exception as e:
+            error_msg = f"Error registering device: {str(e)}"
+            #logging.error(error_msg)
+            RSKafkaException(
+                message=error_msg,
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                kafka_client=self.kafka_client,
+                topic=kafka_topic
+            )
 
-        except SQLAlchemyError as e:
-            self.db_session.rollback()
-            raise RSKafkaException(f"Database error: {e}", self.kafka_client, "device_registration_response")
-        finally:
-            self.db_session.close()
-
+    """
     def update_device_status_service(self, kafka_in_dto):
         try:
             device_id = kafka_in_dto['device_id']
@@ -74,7 +94,9 @@ class DeviceService:
             raise RSKafkaException(f"Database error: {e}", self.kafka_client, "device_status_update_response")
         finally:
             self.db_session.close()
+    """
 
+    """
     def get_device_with_esp32s_service(self, kafka_in_dto):
         try:
             device_id = kafka_in_dto['device_id']
@@ -94,7 +116,9 @@ class DeviceService:
             raise RSKafkaException(f"Database error: {e}", self.kafka_client, "get_device_with_esp32s_response")
         finally:
             self.db_session.close()
+    """
 
+    """
     def assign_esp32_to_bucket_service(self, kafka_in_dto):
         try:
             esp_id = kafka_in_dto['esp_id']
@@ -112,29 +136,48 @@ class DeviceService:
             raise RSKafkaException(f"Database error: {e}", self.kafka_client, "esp32_bucket_assignment_response")
         finally:
             self.db_session.close()
+    """
 
-    def get_active_devices_service(self):
+    @infer_kafka_topic
+    def get_active_devices_service(self, kafka_topic: str = None):
+        """
+        Get all active devices with their ESP32 devices.
+
+        Args:
+            kafka_topic: Kafka topic for response messages
+        """
         try:
-            devices = self.device_repository.get_active_devices()
+            logging.info("Retrieving active devices")
 
-            response_dict = {
-                "devices": [
-                    {
-                        **device.to_dict(),
-                        "esp_devices": [esp.to_dict() for esp in device.esp_devices]
+            with transaction_scope(self.db_session, self.kafka_client, kafka_topic):
+                devices = self.device_repository.get_active_devices()
+
+                response = create_response(
+                    status_code=status.HTTP_200_OK,
+                    message="Active devices retrieved successfully",
+                    data={
+                        "devices": [
+                            {
+                                **device.to_dict(),
+                                "esp_devices": [esp.to_dict() for esp in device.esp_devices]
+                            }
+                            for device in devices
+                        ]
                     }
-                    for device in devices
-                ]
-            }
+                )
+                self.kafka_client.send_message(kafka_topic, response)
 
-            self.kafka_client.send_message("get_active_devices_response", response_dict)
+        except Exception as e:
+            error_msg = f"Error retrieving active devices: {str(e)}"
+            logging.error(error_msg)
+            RSKafkaException(
+                message=error_msg,
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                kafka_client=self.kafka_client,
+                topic=kafka_topic
+            )
 
-        except SQLAlchemyError as e:
-            self.db_session.rollback()
-            raise RSKafkaException(f"Database error: {e}", self.kafka_client, "get_active_devices_response")
-        finally:
-            self.db_session.close()
-
+    """
     def get_all_devices_service(self):
         try:
             devices = self.device_repository.get_all()
@@ -153,7 +196,8 @@ class DeviceService:
             raise RSKafkaException(f"Database error: {e}", self.kafka_client, "get_all_devices_response")
         finally:
             self.db_session.close()
-
+    """
+    """
     # Add ESP32-specific services
     def update_esp32_status_service(self, kafka_in_dto):
         try:
@@ -505,7 +549,7 @@ class DeviceService:
             raise RSKafkaException(f"Database error: {e}", self.kafka_client, "device_migration_response")
         finally:
             self.db_session.close()
-
+    
     def get_device_health_check_service(self, kafka_in_dto):
         try:
             device_id = kafka_in_dto['device_id']
@@ -540,17 +584,81 @@ class DeviceService:
             raise RSKafkaException(f"Health check error: {e}", self.kafka_client, "device_health_check_response")
         finally:
             self.db_session.close()
+    """
 
-    def get_by_id_device_service(self, kafka_in_dto):
+    @infer_kafka_topic
+    def get_by_id_device_service(self, kafka_in_dto, kafka_topic: str = None):
+        """Get device by ID and send response through Kafka."""
+
         try:
             record_id = kafka_in_dto['id']
-            device = self.device_repository.get_by_id(record_id)
-            logging.info(f"Retrieved device: {device}")
-            device_dict = device.to_dict() if device else {}
-            self.kafka_client.send_message("get_by_id_device_response", device_dict)
-        except SQLAlchemyError as e:
-            self.db_session.rollback()
-            raise RSKafkaException(f"Database error: {e}", self.kafka_client, "get_by_id_device_response")
+            logging.info(f"Attempting to retrieve device with ID: {record_id}")
 
-        finally:
-            self.db_session.close()
+            with transaction_scope(self.db_session, self.kafka_client, kafka_topic):
+                device = self.device_repository.get_by_id(record_id)
+
+                if device:
+                    logging.info(f"Successfully retrieved device: {device}")
+                    response = create_response(
+                        status_code=status.HTTP_200_OK,
+                        message="Device retrieved successfully",
+                        data=device.to_dict()
+                    )
+                    self.kafka_client.send_message(kafka_topic, response)
+                else:
+                    logging.warning(f"Device with ID {record_id} not found")
+                    error_msg = f"id: {record_id} not found"
+                    RSKafkaException(
+                        message=error_msg,
+                        code=status.HTTP_404_NOT_FOUND,
+                        kafka_client=self.kafka_client,
+                        topic=kafka_topic
+                    )
+
+        except Exception as e:
+            error_msg = f"Error retrieving device: {str(e)}"
+            logging.error(error_msg)
+            RSKafkaException(
+                message=error_msg,
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                kafka_client=self.kafka_client,
+                topic=kafka_topic
+            )
+
+    @infer_kafka_topic
+    def delete_device_service(self, kafka_in_dto,  kafka_topic: str = None):
+        """Delete a device and send response through Kafka."""
+        try:
+            record_id = kafka_in_dto['id']
+            logging.info(f"Attempting to delete device with ID: {record_id}")
+
+            with transaction_scope(self.db_session, self.kafka_client, kafka_topic):
+                device = self.device_repository.get_by_id(record_id)
+
+                if device:
+                    self.device_repository.delete(device)
+                    response = create_response(
+                        status_code=status.HTTP_200_OK,
+                        message="Device deleted successfully"
+                    )
+                    self.kafka_client.send_message(kafka_topic, response)
+                else:
+                    error_msg = f"id: {record_id} not found"
+                    RSKafkaException(
+                        message=error_msg,
+                        code=status.HTTP_404_NOT_FOUND,
+                        kafka_client=self.kafka_client,
+                        topic=kafka_topic
+                    )
+
+                self.kafka_client.send_message(kafka_topic, response)
+
+        except Exception as e:
+            error_msg = f"Error deleting device: {str(e)}"
+            logging.error(error_msg)
+            RSKafkaException(
+                message=error_msg,
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                kafka_client=self.kafka_client,
+                topic=kafka_topic
+            )

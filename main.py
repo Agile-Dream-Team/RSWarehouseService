@@ -411,15 +411,11 @@ def consume_message_migrate_device(msg):
         raise RSKafkaException(f"Exception: {e}", kafka_client, "device_migration_response")
 
 
-@kafka_client.topic('register_device')
-def consume_message_register_device(msg):
-    try:
-        logging.info(f"Consumed message in register_device: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.register_device_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in register_device: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "device_migration_response")
+@kafka_client.topic('create_device')
+def consume_message_create_device(msg):
+    logging.info(f"Consumed message in create_device: {msg}")
+    kafka_service_device = get_kafka_service_device()
+    kafka_service_device.create_device_service(msg)
 
 
 @kafka_client.topic('get_by_id_device')
@@ -431,6 +427,17 @@ def consume_message_get_by_id_device(msg):
     except Exception as e:
         logging.error(f"Error processing message in get_by_id_device: {e}")
         raise RSKafkaException(f"Exception: {e}", kafka_client, "get_by_id_device_response")
+
+
+@kafka_client.topic('delete_device')
+def consume_message_delete_device(msg):
+    try:
+        logging.info(f"Consumed message in get_by_id_device: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.delete_device_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in delete_device: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "delete_device_response")
 
 
 if __name__ == "__main__":
