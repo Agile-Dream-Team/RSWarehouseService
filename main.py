@@ -246,62 +246,6 @@ def consume_message_delete_pod(msg):
         RSKafkaException(f"Exception: {e}", kafka_client, "delete_pod_response")
 
 
-# Device Kafka consumers
-@kafka_client.topic('get_all_devices')
-def consume_message_get_all_devices(msg):
-    try:
-        logging.info(f"Consumed message in get_all_devices: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.get_all_devices_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in get_all_devices: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "get_all_devices_response")
-
-
-@kafka_client.topic('device')
-def consume_message_save_device(msg):
-    try:
-        logging.info(f"Consumed message in device: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.save_device_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in device: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "device_response")
-
-
-@kafka_client.topic('get_by_id_device')
-def consume_message_get_by_id_device(msg):
-    try:
-        logging.info(f"Consumed message in get_by_id_device: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.get_by_id_device_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in get_by_id_device: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "get_by_id_device_response")
-
-
-@kafka_client.topic('update_device')
-def consume_message_update_device(msg):
-    try:
-        logging.info(f"Consumed message in update_device: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.update_device_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in update_device: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "update_device_response")
-
-
-@kafka_client.topic('delete_device')
-def consume_message_delete_device(msg):
-    try:
-        logging.info(f"Consumed message in delete_device: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.delete_device_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in delete_device: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "delete_device_response")
-
-
 @kafka_client.topic('get_all_buckets')
 def consume_message_get_all_buckets(msg):
     try:
@@ -357,17 +301,6 @@ def consume_message_delete_bucket(msg):
         RSKafkaException(f"Exception: {e}", kafka_client, "delete_bucket_response")
 
 
-@kafka_client.topic('get_devices_by_pod')
-def consume_message_get_devices_by_pod(msg):
-    try:
-        logging.info(f"Consumed message in get_devices_by_pod: {msg}")
-        kafka_service_device = get_kafka_service_device()
-        kafka_service_device.get_devices_by_pod_service(msg)
-    except Exception as e:
-        logging.error(f"Error processing message in get_devices_by_pod: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "get_devices_by_pod_response")
-
-
 @kafka_client.topic('get_buckets_by_device')
 def consume_message_get_buckets_by_device(msg):
     try:
@@ -390,15 +323,121 @@ def consume_message_get_pod_with_devices(msg):
         RSKafkaException(f"Exception: {e}", kafka_client, "get_pod_with_devices_response")
 
 
-@kafka_client.topic('get_device_with_buckets')
-def consume_message_get_device_with_buckets(msg):
+@kafka_client.topic('get_active_devices')
+def consume_message_get_active_devices(msg):
     try:
-        logging.info(f"Consumed message in get_device_with_buckets: {msg}")
+        logging.info(f"Consumed message in get_active_devices: {msg}")
         kafka_service_device = get_kafka_service_device()
-        kafka_service_device.get_device_with_buckets_service(msg)
+        kafka_service_device.get_active_devices_service()
     except Exception as e:
-        logging.error(f"Error processing message in get_device_with_buckets: {e}")
-        RSKafkaException(f"Exception: {e}", kafka_client, "get_device_with_buckets_response")
+        logging.error(f"Error processing message in get_active_devices: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "get_active_devices_response")
+
+
+@kafka_client.topic('get_inactive_devices')
+def consume_message_get_inactive_devices(msg):
+    try:
+        logging.info(f"Consumed message in get_inactive_devices: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.get_inactive_devices_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in get_inactive_devices: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "get_inactive_devices_response")
+
+
+@kafka_client.topic('validate_device_configuration')
+def consume_message_validate_device_configuration(msg):
+    try:
+        logging.info(f"Consumed message in validate_device_configuration: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.validate_device_configuration_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in validate_device_configuration: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "device_validation_response")
+
+
+@kafka_client.topic('sync_device_configuration')
+def consume_message_sync_device_configuration(msg):
+    try:
+        logging.info(f"Consumed message in sync_device_configuration: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.sync_device_configuration_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in sync_device_configuration: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "device_sync_response")
+
+
+@kafka_client.topic('get_device_by_serial')
+def consume_message_get_device_by_serial(msg):
+    try:
+        logging.info(f"Consumed message in get_device_by_serial: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.get_device_by_serial_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in get_device_by_serial: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "get_device_by_serial_response")
+
+
+@kafka_client.topic('bulk_update_esp32_status')
+def consume_message_bulk_update_esp32_status(msg):
+    try:
+        logging.info(f"Consumed message in bulk_update_esp32_status: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.bulk_update_esp32_status_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in bulk_update_esp32_status: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "bulk_esp32_status_update_response")
+
+
+@kafka_client.topic('get_device_summary')
+def consume_message_get_device_summary(msg):
+    try:
+        logging.info(f"Consumed message in get_device_summary: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.get_device_summary_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in get_device_summary: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "device_summary_response")
+
+
+@kafka_client.topic('migrate_device')
+def consume_message_migrate_device(msg):
+    try:
+        logging.info(f"Consumed message in migrate_device: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.migrate_device_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in migrate_device: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "device_migration_response")
+
+
+@kafka_client.topic('create_device')
+def consume_message_create_device(msg):
+    logging.info(f"Consumed message in create_device: {msg}")
+    kafka_service_device = get_kafka_service_device()
+    kafka_service_device.create_device_service(msg)
+
+
+@kafka_client.topic('get_by_id_device')
+def consume_message_get_by_id_device(msg):
+    try:
+        logging.info(f"Consumed message in get_by_id_device: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.get_by_id_device_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in get_by_id_device: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "get_by_id_device_response")
+
+
+@kafka_client.topic('delete_device')
+def consume_message_delete_device(msg):
+    try:
+        logging.info(f"Consumed message in get_by_id_device: {msg}")
+        kafka_service_device = get_kafka_service_device()
+        kafka_service_device.delete_device_service(msg)
+    except Exception as e:
+        logging.error(f"Error processing message in delete_device: {e}")
+        raise RSKafkaException(f"Exception: {e}", kafka_client, "delete_device_response")
 
 
 if __name__ == "__main__":
