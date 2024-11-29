@@ -41,6 +41,7 @@ class DeviceService:
 
                 # Process ESP32 devices if any
                 esp_devices = []
+
                 if 'esp_devices' in kafka_in_dto:
                     for esp_data in kafka_in_dto['esp_devices']:
                         esp_device = self.esp32_repository.create_esp32(
